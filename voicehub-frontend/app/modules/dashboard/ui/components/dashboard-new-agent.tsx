@@ -8,10 +8,10 @@ import { useAgents } from "../../lib/agent-context";
 
 export const AgentButton = () => {
   const [open, setOpen] = useState(false);
-  const { addAgent } = useAgents(); // Get addAgent function from context
+  const { addAgent } = useAgents();
 
   const handleCreate = (name: string, description: string) => {
-    addAgent(name, description); // Add agent to global state
+    addAgent(name, description);
   };
 
   return (

@@ -8,7 +8,6 @@ import {
 import { Server, Socket } from 'socket.io';
 
 // This decorator makes this class a WebSocket gateway
-// cors: true allows your Next.js app to connect
 @WebSocketGateway({
   cors: {
     origin: 'http://localhost:3000',
@@ -38,7 +37,7 @@ export class ChatGateway {
   ) {
     console.log('Received message:', data);
 
-    // Simulate agent response (later we'll add LLM here)
+    // Simulate agent response (I'll add LLM Model here)
     const agentResponse = {
       sender: 'agent',
       text: `Thank you for your message: "${data.message}". This is a response from the NestJS backend!`,
