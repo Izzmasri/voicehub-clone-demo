@@ -1,48 +1,109 @@
 "use client";
 
-import { createContext, useContext, useState, ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  ReactNode,
+} from "react";
 import { Agent } from "../types/agent";
-import { mockAgents } from "../lib/agent-data";
+import { agentsApi } from "../lib/api/agents-api";
 
 interface AgentContextType {
   agents: Agent[];
-  addAgent: (name: string, description: string) => void;
-  deleteAgent: (id: number) => void;
-  updateAgent: (id: number, updates: Partial<Agent>) => void;
+  loading: boolean;
+  error: string | null;
+  addAgent: (name: string, description: string) => Promise<void>;
+  deleteAgent: (id: string) => Promise<void>;
+  updateAgent: (
+    id: string,
+    name?: string,
+    description?: string
+  ) => Promise<void>;
+  refreshAgents: () => Promise<void>;
 }
 
 const AgentContext = createContext<AgentContextType | undefined>(undefined);
 
 export function AgentProvider({ children }: { children: ReactNode }) {
-  const [agents, setAgents] = useState<Agent[]>(mockAgents);
+  const [agents, setAgents] = useState<Agent[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const addAgent = (name: string, description: string) => {
-    const newAgent: Agent = {
-      id: Date.now(),
-      name,
-      description,
-      total: 0,
-      status: "Open",
-    };
-    setAgents([newAgent, ...agents]);
-    console.log("Created new agent:", newAgent);
+  // Fetch agents from backend on mount
+  const refreshAgents = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const fetchedAgents = await agentsApi.getAll();
+      setAgents(fetchedAgents);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to fetch agents");
+      console.error("Error fetching agents:", err);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const deleteAgent = (id: number) => {
-    setAgents(agents.filter((agent) => agent.id !== id));
+  useEffect(() => {
+    refreshAgents();
+  }, []);
+
+  const addAgent = async (name: string, description: string) => {
+    try {
+      const newAgent = await agentsApi.create(name, description);
+      setAgents([newAgent, ...agents]);
+      console.log("Created new agent:", newAgent);
+    } catch (err) {
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to create agent";
+      setError(errorMessage);
+      throw new Error(errorMessage); // Re-throw so modal can show error
+    }
   };
 
-  const updateAgent = (id: number, updates: Partial<Agent>) => {
-    setAgents(
-      agents.map((agent) =>
-        agent.id === id ? { ...agent, ...updates } : agent
-      )
-    );
+  const deleteAgent = async (id: string) => {
+    try {
+      await agentsApi.delete(id);
+      setAgents(agents.filter((agent) => agent._id !== id));
+    } catch (err) {
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to delete agent";
+      setError(errorMessage);
+      throw new Error(errorMessage);
+    }
+  };
+
+  const updateAgent = async (
+    id: string,
+    name?: string,
+    description?: string
+  ) => {
+    try {
+      const updatedAgent = await agentsApi.update(id, name, description);
+      setAgents(
+        agents.map((agent) => (agent._id === id ? updatedAgent : agent))
+      );
+    } catch (err) {
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to update agent";
+      setError(errorMessage);
+      throw new Error(errorMessage);
+    }
   };
 
   return (
     <AgentContext.Provider
-      value={{ agents, addAgent, deleteAgent, updateAgent }}
+      value={{
+        agents,
+        loading,
+        error,
+        addAgent,
+        deleteAgent,
+        updateAgent,
+        refreshAgents,
+      }}
     >
       {children}
     </AgentContext.Provider>

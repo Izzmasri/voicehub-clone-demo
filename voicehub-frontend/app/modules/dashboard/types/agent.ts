@@ -1,7 +1,9 @@
 export interface Agent {
-  id: number;
+  _id: string;
   name: string;
   description: string;
-  total: number;
   status: string;
+  total: number;
+  createdAt?: string;
+  updatedAt?: string;
 }

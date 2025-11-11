@@ -8,13 +8,22 @@ import { Badge } from "@/components/ui/badge";
 import { SendHorizontal, Cpu } from "lucide-react";
 import { AgentCard } from "../modules/dashboard/ui/components/agent-card";
 import { ChatDrawer } from "../modules/dashboard/ui/components/chat-drawer";
-import { mockAgents } from "../modules/dashboard/lib/agent-data";
 import { Agent } from "../modules/dashboard/types/agent";
+import { EditAgentModal } from "../modules/dashboard/ui/components/edit-agent-modal";
+import { DeleteAgentDialog } from "../modules/dashboard/ui/components/delete-agent-dialog";
+import { useAgents } from "../modules/dashboard/lib/agent-context";
 
 export default function MainPage() {
-  // State to track which agent's chat drawer is open
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+
+  const { agents, deleteAgent, updateAgent } = useAgents();
+
+  const [agentToDelete, setAgentToDelete] = useState<Agent | null>(null);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+
+  const [agentToEdit, setAgentToEdit] = useState<Agent | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
   const suggestedPrompts = [
     "Customer support",
@@ -33,23 +42,49 @@ export default function MainPage() {
   };
 
   const handleDelete = (agent: Agent) => {
-    console.log("Delete agent:", agent);
+    setAgentToDelete(agent);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (agentToDelete) {
+      try {
+        await deleteAgent(agentToDelete._id); // Changed from .id to ._id
+        console.log("Deleted agent:", agentToDelete);
+      } catch (err) {
+        alert("Failed to delete agent");
+      }
+    }
+    setIsDeleteDialogOpen(false);
+    setAgentToDelete(null);
   };
 
   const handleEdit = (agent: Agent) => {
-    console.log("Edit agent:", agent);
+    setAgentToEdit(agent);
+    setIsEditModalOpen(true);
   };
 
-  // When user clicks "Start Chat"
+  const handleUpdateAgent = async (
+    id: string,
+    name: string,
+    description: string
+  ) => {
+    // Changed from number to string
+    try {
+      await updateAgent(id, name, description);
+      console.log("Updated agent:", { id, name, description });
+    } catch (err) {
+      alert("Failed to update agent");
+    }
+  };
+
   const handleChat = (agent: Agent) => {
-    setSelectedAgent(agent); // Store which agent was selected
-    setIsDrawerOpen(true); // Open the drawer
+    setSelectedAgent(agent);
+    setIsDrawerOpen(true);
   };
 
-  // When user closes the drawer
   const handleCloseDrawer = () => {
     setIsDrawerOpen(false);
-    // Optional: Clear selected agent after animation
     setTimeout(() => setSelectedAgent(null), 300);
   };
 
@@ -114,9 +149,9 @@ export default function MainPage() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {mockAgents.map((agent) => (
+              {agents.map((agent) => (
                 <AgentCard
-                  key={agent.id}
+                  key={agent._id}
                   agent={agent}
                   onCopy={handleCopy}
                   onDelete={handleDelete}
@@ -139,10 +174,31 @@ export default function MainPage() {
           </div>
         </div>
       </div>
+
       <ChatDrawer
         agent={selectedAgent}
         open={isDrawerOpen}
         onClose={handleCloseDrawer}
+      />
+
+      <DeleteAgentDialog
+        agent={agentToDelete}
+        open={isDeleteDialogOpen}
+        onClose={() => {
+          setIsDeleteDialogOpen(false);
+          setAgentToDelete(null);
+        }}
+        onConfirm={confirmDelete}
+      />
+
+      <EditAgentModal
+        agent={agentToEdit}
+        open={isEditModalOpen}
+        onClose={() => {
+          setIsEditModalOpen(false);
+          setAgentToEdit(null);
+        }}
+        onUpdate={handleUpdateAgent}
       />
     </>
   );

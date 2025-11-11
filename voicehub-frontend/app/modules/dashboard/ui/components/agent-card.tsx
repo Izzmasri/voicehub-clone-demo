@@ -4,14 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Copy, Trash2, Edit, Bot, MessageSquare } from "lucide-react";
-
-interface Agent {
-  id: number;
-  name: string;
-  description: string;
-  total: number;
-  status: string;
-}
+import { Agent } from "../../types/agent";
 
 interface AgentCardProps {
   agent: Agent;

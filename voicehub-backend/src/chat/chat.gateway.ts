@@ -6,8 +6,10 @@ import {
   ConnectedSocket,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
+import { ConversationService } from './services/conversation.service';
+import { MessageService } from './services/message.service';
+import { MessageSender } from './schemas/message.schema';
 
-// This decorator makes this class a WebSocket gateway
 @WebSocketGateway({
   cors: {
     origin: 'http://localhost:3000',
@@ -15,38 +17,75 @@ import { Server, Socket } from 'socket.io';
   },
 })
 export class ChatGateway {
-  // This gives us access to the Socket.IO server instance
   @WebSocketServer()
   server: Server;
 
-  // Called when a client connects
+  constructor(
+    private readonly conversationService: ConversationService,
+    private readonly messageService: MessageService,
+  ) {}
+
   handleConnection(client: Socket) {
     console.log(`Client connected: ${client.id}`);
   }
 
-  // Called when a client disconnects
   handleDisconnect(client: Socket) {
     console.log(`Client disconnected: ${client.id}`);
   }
 
-  // Listen for 'sendMessage' events from clients
   @SubscribeMessage('sendMessage')
-  handleMessage(
-    @MessageBody() data: { agentId: number; message: string },
+  async handleMessage(
+    @MessageBody()
+    data: {
+      conversationId: string;
+      agentId: string;
+      message: string;
+    },
     @ConnectedSocket() client: Socket,
   ) {
     console.log('Received message:', data);
 
-    // Simulate agent response (I'll add LLM Model here)
-    const agentResponse = {
-      sender: 'agent',
-      text: `Thank you for your message: "${data.message}". This is a response from the NestJS backend!`,
-      timestamp: new Date().toISOString(),
-    };
+    try {
+      // 1. Save user message to database
+      const userMessage = await this.messageService.create({
+        conversationId: data.conversationId,
+        sender: MessageSender.USER,
+        text: data.message,
+      });
 
-    // Send response back to the client who sent the message
-    client.emit('receiveMessage', agentResponse);
+      console.log('User message saved:', userMessage);
 
-    return { status: 'Message received' };
+      // 2. Update conversation's lastMessageAt
+      await this.conversationService.updateLastMessage(data.conversationId);
+
+      // 3. Generate agent response (still fake for now, LLM later)
+      const agentResponseText = `Thank you for your message: "${data.message}". This is a response from the NestJS backend!`;
+
+      // 4. Save agent response to database
+      const agentMessage = await this.messageService.create({
+        conversationId: data.conversationId,
+        sender: MessageSender.AGENT,
+        text: agentResponseText,
+      });
+
+      // 5. Update conversation's lastMessageAt again
+      await this.conversationService.updateLastMessage(data.conversationId);
+
+      // 6. Send response back to client
+      const response = {
+        _id: agentMessage._id,
+        conversationId: data.conversationId,
+        sender: 'AGENT',
+        text: agentMessage.text,
+        timestamp: agentMessage.timestamp.toISOString(),
+      };
+
+      client.emit('receiveMessage', response);
+
+      return { status: 'Message received and saved' };
+    } catch (error) {
+      console.error('Error handling message:', error);
+      client.emit('error', { message: 'Failed to save message' });
+    }
   }
 }
